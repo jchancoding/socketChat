@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+    <style media="screen">
+      #messages{height: 300px;}
+    </style>
+    <title>MongoChat</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-md-6 offset-md-3 col-sm-12">
+          <h1 class="text-center">
+            MongoChat
+            <button class="btn btn-danger" id="clear" type="" name="button">Clear</button>
+          </h1>
+          <div id="status"></div>
+          <div id="chat">
+            <input
+              type="text"
+              id="username"
+              class="form-control"
+              placeholder="Enter name">
+              <br>
+              <div class="card">
+                <div id="messages" class="card-block"></div>
+              </div>
+              <br>
+              <textarea id="textarea" class="form-control" placeholder="Enter message"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js">
+    </script>
+
+    <script>
+      (function(){
+        var element = function(id){
+          return document.getElementById(id);
+        }
+
+        //get elements
+        var status = element('status');
+        var messages = element('messages');
+        var textarea  = element('textarea');
+        var username = element('username');
+        var clear = element('clear');
+
+        //set default status
+        var statusDefault = status.textContent;
+
+        var setStatus = function(s){
+          //set status
+          status.textContent = s;
+          if(s !== statusDefault) {
+            var delay = setTimeout(function(){
+              setStatus(statusDefault);
+            }, 4000);
+          }
+        }
+
+        //connect to socket.io
+        var socket = io.connect('http://127.0.0.1:4000');
+
+        //check for connection
+        if(socket !== undefined){
+          console.log('connected to socket');
+
+          //handle output
+          socket.on('output', function(data){
+            console.log(data);
+            if(data.length){
+              for(var x=0; x < data.length; x++){
+                //build out message div
+                var message = document.createElement('div');
+                message.setAttribute('class', 'chat-message');
+                message.textContent = data[x].name+": "+data[x].message;
+                messages.appendChild(message);
+                messages.insertBefore(message, messages.firstChild);
+              }
+            }
+          });
+
+          //get status from server
+          socket.on('status', function(data){
+            //get message status
+            setStatus((typeof data === 'object')? data.message : data);
+
+            //if status is clear, clear text
+            if(data.clear){
+              //empty out Enter message box (so you can enter your next message)
+              textarea.value = '';
+            }
+          });
+          
+          //handle input
+          textarea.addEventListener('keydown', function(event){
+            if(event.which === 13 && event.shiftKey === false){
+              //emit to server input
+              socket.emit('input', {
+                name: username.value,
+                message: textarea.value
+              });
+
+              //prevent default behavior
+              event.preventDefault();
+            }
+          })
+
+          //handle chat clear button
+          clear.addEventListener('click', function(){
+            socket.emit('clear');
+          });
+
+          //clear message
+          socket.on('cleared', function(){
+            messages.textContent = '';
+          });
+
+
+        }
+
+      })();
+    </script>
+  </body>
+</html>
